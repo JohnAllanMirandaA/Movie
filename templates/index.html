@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Movie Recommender</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #181818;
+    color: #fffde7;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem;
+    min-height: 100vh;
+  }
+  h1 {
+    color: #f5c518;
+    letter-spacing: 2px;
+    margin-bottom: 2rem;
+    text-shadow: 1px 1px 8px #000;
+    font-size: 2.5rem;
+    font-weight: bold;
+  }
+  .recommender-container {
+    background: #232323;
+    padding: 2rem 2.5rem 2.5rem 2.5rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 340px;
+    max-width: 95vw;
+    margin-bottom: 2rem;
+  }
+  .filters-row {
+    display: flex;
+    gap: 1.5em;
+    margin-bottom: 1.2em;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .filter-label {
+    font-size: 1.08rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    cursor: pointer;
+  }
+  .inputs-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7em;
+    width: 100%;
+    margin-bottom: 1.2em;
+  }
+  input, button, select {
+    font-size: 1rem;
+    padding: 0.7rem;
+    border-radius: 4px;
+    border: none;
+    outline: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    width: 100%;
+    background: #232323;
+    color: #fffde7;
+    border: 1px solid #444;
+    transition: border 0.2s;
+  }
+  input:focus, select:focus {
+    border: 1.5px solid #f5c518;
+  }
+  button {
+    cursor: pointer;
+    background: #f5c518;
+    color: #181818;
+    font-weight: bold;
+    border: none;
+    transition: background 0.2s, color 0.2s;
+    box-shadow: 0 2px 8px rgba(245,197,24,0.15);
+    margin-top: 0.5em;
+  }
+  button:hover {
+    background: #fffde7;
+    color: #181818;
+  }
+  h2 {
+    color: #f5c518;
+    margin-top: 1.5rem;
+    margin-bottom: 0.7rem;
+    letter-spacing: 1px;
+    font-size: 1.6rem;
+    text-align: center;
+  }
+  ul {
+    list-style: none;
+    padding: 0;
+    max-width: 400px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  li {
+    background: #232323;
+    margin: 0.3rem 0;
+    padding: 0.7rem 1rem;
+    border-radius: 4px;
+    color: #fffde7;
+    border-left: 6px solid #f5c518;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    transition: background 0.2s;
+    font-size: 1.08rem;
+  }
+  li:hover {
+    background: #282828;
+  }
+  @media (max-width: 500px) {
+    .recommender-container {
+      padding: 1rem 0.5rem 1.5rem 0.5rem;
+      min-width: 0;
+    }
+    ul {
+      max-width: 98vw;
+    }
+    input, button, select {
+      width: 98vw;
+      max-width: 98vw;
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>Movie Recommender System</h1>
+
+<div class="recommender-container">
+  <div class="filters-row">
+    <label class="filter-label"><input type="checkbox" id="filter-name" onchange="toggleInputs()"> By Movie Name</label>
+    <label class="filter-label"><input type="checkbox" id="filter-genre" onchange="toggleInputs()"> By Genre</label>
+    <label class="filter-label"><input type="checkbox" id="filter-imdb"> Top IMDb</label>
+  </div>
+  <div class="inputs-row">
+    <input id="movie-title" type="text" placeholder="Enter movie title..." style="display:none;" autocomplete="off"/>
+    <input id="genre-input" type="text" placeholder="Enter genre (e.g. Horror)" style="display:none;" autocomplete="off"/>
+    <button onclick="getRecommendations()">Get Recommendations</button>
+  </div>
+</div>
+<h2>Recommendations:</h2>
+<ul id="recommendations-list"></ul>
+
+<script>
+function toggleInputs() {
+    document.getElementById('movie-title').style.display = document.getElementById('filter-name').checked ? 'block' : 'none';
+    document.getElementById('genre-input').style.display = document.getElementById('filter-genre').checked ? 'block' : 'none';
+}
+
+async function getRecommendations() {
+    const useName = document.getElementById('filter-name').checked;
+    const useGenre = document.getElementById('filter-genre').checked;
+    const useImdb = document.getElementById('filter-imdb').checked;
+    const title = document.getElementById('movie-title').value.trim();
+    const genre = document.getElementById('genre-input').value.trim();
+    const list = document.getElementById('recommendations-list');
+    list.innerHTML = 'Loading...';
+
+    if (useName && !title) {
+        list.innerHTML = '<li>Please enter a movie name.</li>';
+        return;
+    }
+    if (useGenre && !genre) {
+        list.innerHTML = '<li>Please enter a genre.</li>';
+        return;
+    }
+
+    try {
+        const response = await fetch('/recommend', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                title, 
+                genre, 
+                useName, 
+                useGenre, 
+                useImdb 
+            })
+        });
+
+        const data = await response.json();
+        list.innerHTML = '';
+        if(data.recommendations.length === 1 && data.recommendations[0] === "Movie not found"){
+            list.innerHTML = '<li>Movie not found. Please try another filter.</li>';
+            return;
+        }
+
+        data.recommendations.forEach(rec => {
+            const li = document.createElement('li');
+            li.textContent = rec;
+            list.appendChild(li);
+        });
+    } catch (err) {
+        list.innerHTML = '<li>Error getting recommendations.</li>';
+        console.error(err);
+    }
+}
+</script>
+
+</body>
+</html>
