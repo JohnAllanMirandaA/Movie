@@ -199,7 +199,23 @@ def recommend():
     if useImdb:
         filtered_movies['vote_average'] = pd.to_numeric(filtered_movies['vote_average'], errors='coerce')
         filtered_movies = filtered_movies.sort_values('vote_average', ascending=False)
-
+    mood = data.get('mood', '').lower().strip()
+    mood_keywords = {
+        'happy': ['friendship', 'fun', 'family', 'comedy', 'joy', 'holiday'],
+        'sad': ['tragedy', 'death', 'loss', 'drama', 'tearjerker'],
+        'thrilling': ['thriller', 'suspense', 'chase', 'crime', 'mystery'],
+        'romantic': ['romance', 'love', 'relationship', 'kiss'],
+        'adventurous': ['adventure', 'journey', 'exploration', 'quest'],
+        'scary': ['horror', 'ghost', 'killer', 'monster', 'fear'],
+        'inspiring': ['biography', 'overcome', 'success', 'inspire', 'dream']
+    }
+    if mood and mood in mood_keywords:
+        keywords_set = set(mood_keywords[mood])
+        def has_mood(row):
+            genres = row['genres'] if isinstance(row['genres'], list) else []
+            keywords = row['keywords'] if isinstance(row['keywords'], list) else []
+            return bool(keywords_set.intersection(set([g.lower() for g in genres + keywords])))
+        filtered_movies = filtered_movies[filtered_movies.apply(has_mood, axis=1)]
     recs = filtered_movies.drop_duplicates('title').head(top_n)
     if recs.empty:
         return jsonify({'recommendations': []})
@@ -211,9 +227,13 @@ def recommend():
             'title': row['title'],
             'year': str(row['release_date'])[:4] if pd.notnull(row.get('release_date', None)) else '',
             'rating': row.get('vote_average', ''),
-            'genres': row.get('genres', ''),
-            'overview': row.get('overview', '')
-        })
+            'imdb_id': row.get('imdb_id', ''),
+
+            'genres': ', '.join(row.get('genres', [])) if isinstance(row.get('genres', ''), list) else row.get('genres', ''),
+            'overview': row.get('overview', ''),
+            'director': row.get('director', ''),
+            'cast': ', '.join(row.get('cast', [])) if isinstance(row.get('cast', ''), list) else row.get('cast', ''),
+            'keywords': ', '.join(row.get('keywords', [])) if isinstance(row.get('keywords', ''), list) else row.get('keywords', '')        })
 
     return jsonify({'recommendations': result})
 
