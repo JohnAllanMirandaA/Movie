@@ -142,7 +142,15 @@
   </div>
   <div class="inputs-row">
     <input id="movie-title" type="text" placeholder="Enter movie title..." style="display:none;" autocomplete="off"/>
-    <input id="genre-input" type="text" placeholder="Enter genre (e.g. Horror)" style="display:none;" autocomplete="off"/>
+<!-- Replace this -->
+<!-- <input id="genre-input" type="text" placeholder="Enter genre (e.g. Horror)" style="display:none;" autocomplete="off"/> -->
+
+<!-- With this -->
+<select id="genre-input" style="display:none;">
+    <option value="">Select Genre</option>
+</select>    <!-- Add these inside your .inputs-row div -->
+<input id="year-from" type="number" placeholder="Year from (e.g. 2000)" min="1900" max="2100" style="margin-top:0.5em;"/>
+<input id="year-to" type="number" placeholder="Year to (e.g. 2020)" min="1900" max="2100" style="margin-top:0.5em;"/>
     <button onclick="getRecommendations()">Get Recommendations</button>
   </div>
 </div>
@@ -150,6 +158,19 @@
 <ul id="recommendations-list"></ul>
 
 <script>
+    window.onload = async function() {
+    const genreSelect = document.getElementById('genre-input');
+    if (genreSelect) {
+        try {
+            const res = await fetch('/genres');
+            const genres = await res.json();
+            genreSelect.innerHTML = '<option value="">Select Genre</option>' +
+                genres.map(g => `<option value="${g}">${g}</option>`).join('');
+        } catch (err) {
+            genreSelect.innerHTML = '<option value="">Error loading genres</option>';
+        }
+    }
+};
 function toggleInputs() {
     document.getElementById('movie-title').style.display = document.getElementById('filter-name').checked ? 'block' : 'none';
     document.getElementById('genre-input').style.display = document.getElementById('filter-genre').checked ? 'block' : 'none';
@@ -160,7 +181,10 @@ async function getRecommendations() {
     const useGenre = document.getElementById('filter-genre').checked;
     const useImdb = document.getElementById('filter-imdb').checked;
     const title = document.getElementById('movie-title').value.trim();
+
     const genre = document.getElementById('genre-input').value.trim();
+     const yearFrom = document.getElementById('year-from').value.trim();
+    const yearTo = document.getElementById('year-to').value.trim();
     const list = document.getElementById('recommendations-list');
     list.innerHTML = 'Loading...';
 
@@ -182,7 +206,9 @@ async function getRecommendations() {
                 genre, 
                 useName, 
                 useGenre, 
-                useImdb 
+                useImdb,
+                yearFrom,
+                yearTo 
             })
         });
 
@@ -192,12 +218,20 @@ async function getRecommendations() {
             list.innerHTML = '<li>Movie not found. Please try another filter.</li>';
             return;
         }
+        const defaultPoster = "https://via.placeholder.com/60x90?text=No+Image";
 
-        data.recommendations.forEach(rec => {
-            const li = document.createElement('li');
-            li.textContent = rec;
-            list.appendChild(li);
-        });
+data.recommendations.forEach(rec => {
+    const li = document.createElement('li');
+    li.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:0.3em;">
+            <span style="font-size:1.2em;font-weight:bold;">${rec.title}${rec.year ? ` (${rec.year})` : ''}</span>
+            ${rec.rating ? `<span style="color:#f5c518;font-weight:bold;">⭐ ${rec.rating}</span>` : ''}
+            ${rec.genres ? `<span style="color:#bbb;">${rec.genres}</span>` : ''}
+            ${rec.overview ? `<div style="margin-top:0.5em;color:#eee;">${rec.overview}</div>` : ''}
+        </div>
+    `;
+    list.appendChild(li);
+});
     } catch (err) {
         list.innerHTML = '<li>Error getting recommendations.</li>';
         console.error(err);

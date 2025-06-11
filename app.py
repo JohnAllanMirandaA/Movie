@@ -6,7 +6,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import linear_kernel
 from surprise import SVD, Dataset, Reader
 from surprise.model_selection import train_test_split
-
+import random
 app = Flask(__name__)
 
 # -------- Load and preprocess data once when app starts --------
@@ -140,6 +140,18 @@ def hybrid_recommendations(title, userId, top_n=10):
 @app.route('/')
 def home():
     return render_template('index.html')
+
+@app.route('/genres', methods=['GET'])
+def get_genres():
+    # Flatten the list of genres and get unique values
+    all_genres = set()
+    for genre_list in movies['genres']:
+        if isinstance(genre_list, list):
+            all_genres.update(genre_list)
+        elif isinstance(genre_list, str):
+            # In case genres are stored as comma-separated strings
+            all_genres.update([g.strip() for g in genre_list.split(',') if g.strip()])
+    return jsonify(sorted(all_genres))
 @app.route('/recommend', methods=['POST'])
 def recommend():
     data = request.json
@@ -148,35 +160,62 @@ def recommend():
     useName = data.get('useName', False)
     useGenre = data.get('useGenre', False)
     useImdb = data.get('useImdb', False)
+    year_from = data.get('yearFrom', '').strip()
+    year_to = data.get('yearTo', '').strip()
     top_n = 10
 
     filtered_movies = movies.copy()
+    filtered_movies = movies.copy()
 
-    # Filter by genre if selected
+    # --- Year filter ---
+    if year_from or year_to:
+        # Ensure release_date is string and not null
+        filtered_movies = filtered_movies[pd.notnull(filtered_movies['release_date'])]
+        filtered_movies = filtered_movies[filtered_movies['release_date'].astype(str).str.len() >= 4]
+        filtered_movies['year'] = filtered_movies['release_date'].astype(str).str[:4].astype(int)
+        if year_from and year_to:
+            filtered_movies = filtered_movies[
+                (filtered_movies['year'] >= int(year_from)) & (filtered_movies['year'] <= int(year_to))
+            ]
+        elif year_from:
+            filtered_movies = filtered_movies[filtered_movies['year'] >= int(year_from)]
+        elif year_to:
+            filtered_movies = filtered_movies[filtered_movies['year'] <= int(year_to)]
+    # ...existing code to filter movies...
     if useGenre and genre:
         genre_lower = genre.lower()
         filtered_movies = filtered_movies[filtered_movies['genres'].apply(
-            lambda x: any(genre_lower in g.lower() for g in x) if isinstance(x, list) else False
+            lambda x: genre_lower in str(x).lower()
         )]
+        # Shuffle the filtered movies for randomness
+        filtered_movies = filtered_movies.sample(frac=1, random_state=random.randint(0, 100000))
 
-    # Filter by name if selected
     if useName and title:
         title_lower = title.lower()
         filtered_movies = filtered_movies[filtered_movies['title'].apply(
             lambda t: isinstance(t, str) and title_lower in t.lower()
         )]
 
-    # If IMDb filter is selected, sort by rating
     if useImdb:
         filtered_movies['vote_average'] = pd.to_numeric(filtered_movies['vote_average'], errors='coerce')
         filtered_movies = filtered_movies.sort_values('vote_average', ascending=False)
 
-    # Remove duplicates and get top N
-    recs = filtered_movies.drop_duplicates('title').head(top_n)['title'].tolist()
-    if not recs:
-        recs = ["Movie not found"]
+    recs = filtered_movies.drop_duplicates('title').head(top_n)
+    if recs.empty:
+        return jsonify({'recommendations': []})
 
-    return jsonify({'recommendations': recs})
+    # Build detailed info for each movie
+    result = []
+    for _, row in recs.iterrows():
+        result.append({
+            'title': row['title'],
+            'year': str(row['release_date'])[:4] if pd.notnull(row.get('release_date', None)) else '',
+            'rating': row.get('vote_average', ''),
+            'genres': row.get('genres', ''),
+            'overview': row.get('overview', '')
+        })
+
+    return jsonify({'recommendations': result})
 
 if __name__ == '__main__':
     print("Starting Flask app...")
