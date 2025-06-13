@@ -137,7 +137,7 @@
     margin-right: 0.2em;
     vertical-align: middle;
   }
-  /* Modal styles */
+  
   #movie-modal {
     display: none;
     position: fixed;
@@ -284,7 +284,6 @@
 
 <script>
 window.onload = async function() {
-    // Genre dropdown population
     const genreSelect = document.getElementById('genre-input');
     if (genreSelect) {
         try {
@@ -296,8 +295,6 @@ window.onload = async function() {
             genreSelect.innerHTML = '<option value="">Error loading genres</option>';
         }
     }
-
-    // Attach mood-option click handlers here!
     document.querySelectorAll('.mood-option').forEach(opt => {
         opt.onclick = async function() {
             const mood = this.getAttribute('data-mood');
@@ -433,7 +430,6 @@ async function surpriseMe() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                // send all filters as false/empty to get a broad pool
                 title: "",
                 genre: "",
                 useName: false,
@@ -461,14 +457,13 @@ function toggleMoodPicker() {
     picker.style.display = picker.style.display === 'block' ? 'none' : 'block';
 }
 </script>
-<!-- Movie Details Modal -->
 <div id="movie-modal">
   <div id="modal-content">
     <button onclick="closeModal()">×</button>
     <div id="modal-body"></div>
   </div>
 </div>
-<!-- Floating Mood Button -->
+
 <div id="mood-fab" onclick="toggleMoodPicker()" title="Pick a mood for movie suggestions!">😊</div>
 <div id="mood-picker">
   <div class="mood-option" data-mood="happy">😊 Happy</div>

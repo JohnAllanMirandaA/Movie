@@ -9,7 +9,7 @@ from surprise.model_selection import train_test_split
 import random
 app = Flask(__name__)
 
-# -------- Load and preprocess data once when app starts --------
+
 print("Loading data...")
 
 movies = pd.read_csv(r'C:\Movie_recommend\data\movies_metadata.csv', low_memory=False)
@@ -68,25 +68,20 @@ def find_movie_title(title):
     title_lower = title.lower().strip()
     if title_lower in indices.index:
         return title_lower
-    #partial_matches = [t for t in indices.index if title_lower in t]
-    # ...existing code...
+    
     partial_matches = [t for t in indices.index if isinstance(t, str) and title_lower in t]
-# ...existing code...
+
     if partial_matches:
         return partial_matches[0]
     return None
 
 def hybrid_recommendations(title, userId, top_n=10):
     title_lower = title.lower().strip()
-    # 1. Find all partial and exact matches
     matched_titles = [t for t in movies['title'] if isinstance(t, str) and title_lower in t.lower()]
     matched_titles_set = set([t.lower() for t in matched_titles])
 
-    # 2. Get indices for matched titles
     matched_indices = [i for i, t in enumerate(movies['title']) if isinstance(t, str) and title_lower in t.lower()]
-    # ...rest of your function...
-    # 3. Get similar movies using content-based filtering
-    # Use the first matched movie as the reference for similarity
+    
     if matched_indices:
         idx = matched_indices[0]
     else:
@@ -95,16 +90,13 @@ def hybrid_recommendations(title, userId, top_n=10):
     cosine_similarities = linear_kernel(tfidf_matrix[idx], tfidf_matrix).flatten()
     sim_scores_idx = cosine_similarities.argsort()[::-1]
 
-    # 4. Exclude already matched titles from similar movies
-    # 4. Exclude already matched titles from similar movies
+    
     similar_indices = [
         i for i in sim_scores_idx
         if i < len(movies) and isinstance(movies.iloc[i]['title'], str) and movies.iloc[i]['title'].lower() not in matched_titles_set
     ]
-    # 5. Combine matched titles and similar movies
-    recommendations = list(matched_titles)  # Start with all matched titles
+    recommendations = list(matched_titles)  
 
-    # Now get the rest based on predicted rating
     filtered_movies = movies.iloc[similar_indices][['id', 'title']].copy()
     filtered_movies['id'] = pd.to_numeric(filtered_movies['id'], errors='coerce')
 
@@ -117,14 +109,11 @@ def hybrid_recommendations(title, userId, top_n=10):
         scores.append(pred)
 
     filtered_movies['pred_rating'] = scores
-    # Only add enough to reach top_n total recommendations
     needed = max(0, top_n - len(recommendations))
     if needed > 0:
         extra = filtered_movies.sort_values('pred_rating', ascending=False).head(needed)['title'].tolist()
         recommendations.extend(extra)
 
-    # If more than top_n due to matches, trim
-    # Remove duplicates while preserving order
     seen = set()
     unique_recommendations = []
     for title in recommendations:
@@ -136,20 +125,18 @@ def hybrid_recommendations(title, userId, top_n=10):
 
     return unique_recommendations
 
-# ------------------ Flask routes ------------------
+# Flask routes
 @app.route('/')
 def home():
     return render_template('index.html')
 
 @app.route('/genres', methods=['GET'])
 def get_genres():
-    # Flatten the list of genres and get unique values
     all_genres = set()
     for genre_list in movies['genres']:
         if isinstance(genre_list, list):
             all_genres.update(genre_list)
         elif isinstance(genre_list, str):
-            # In case genres are stored as comma-separated strings
             all_genres.update([g.strip() for g in genre_list.split(',') if g.strip()])
     return jsonify(sorted(all_genres))
 @app.route('/recommend', methods=['POST'])
@@ -167,9 +154,7 @@ def recommend():
     filtered_movies = movies.copy()
     filtered_movies = movies.copy()
 
-    # --- Year filter ---
     if year_from or year_to:
-        # Ensure release_date is string and not null
         filtered_movies = filtered_movies[pd.notnull(filtered_movies['release_date'])]
         filtered_movies = filtered_movies[filtered_movies['release_date'].astype(str).str.len() >= 4]
         filtered_movies['year'] = filtered_movies['release_date'].astype(str).str[:4].astype(int)
@@ -181,13 +166,11 @@ def recommend():
             filtered_movies = filtered_movies[filtered_movies['year'] >= int(year_from)]
         elif year_to:
             filtered_movies = filtered_movies[filtered_movies['year'] <= int(year_to)]
-    # ...existing code to filter movies...
     if useGenre and genre:
         genre_lower = genre.lower()
         filtered_movies = filtered_movies[filtered_movies['genres'].apply(
             lambda x: genre_lower in str(x).lower()
         )]
-        # Shuffle the filtered movies for randomness
         filtered_movies = filtered_movies.sample(frac=1, random_state=random.randint(0, 100000))
 
     if useName and title:
@@ -220,7 +203,6 @@ def recommend():
     if recs.empty:
         return jsonify({'recommendations': []})
 
-    # Build detailed info for each movie
     result = []
     for _, row in recs.iterrows():
         result.append({
